@@ -1,0 +1,49 @@
+Add-PSSnapin VMware.VimAutomation.Core               
+$ServerName = "il-vc-01.kaltura.com"                 
+Connect-VIServer -Server $ServerName    
+
+$data = import-Csv \\test.csv
+$file = Get-content \\test.csv
+
+# See the imported values:#
+#$data | Out-GridView
+
+#Print imported data on console
+#Write-Host "HostName=$($line.HostName) IPAddress=$($line.IPAddress) SubnetMask=$($line.SubnetMask) DefaultGateway=$($line.DefaultGateway) Dns=$($line.Dns) DataStore=$($line.DataStore) Esxi=$($line.Esxi) Template=$($line.Template)"
+
+$HostName=@()
+$datastore=@()
+$esxi=@()
+$Template=@()
+$ip=@()
+$mask=@()
+$gw=@()
+$dns=@()
+$raw=$file.Length -1
+
+
+for($i=0; $i -lt $raw; $i++){
+    $ip+=$data[$i].IPAddress
+    $mask+=$data[$i].SubnetMask
+    $gw+=$data[$i].DefaultGateway
+    $dns+=$data[$i].Dns
+    $HostName+=$data[$i].HostName
+    $datastore+=$data[$i].DataStore
+    $esxi+=$data[$i].Esxi
+    $Template+=$data[$i].Template
+
+    #Customization Specification file name.
+    $SpecName = "test-linux"
+
+    #Get Customization Specification file.
+    $nicMapping = Get-OSCustomizationNicMapping –OSCustomizationSpec $SpecName
+
+    # Remove any NIC mappings from the specification
+    Remove-OSCustomizationNicMapping –OSCustomizationNicMapping $nicMapping –Confirm:$false
+
+    #Set Network Customization Specification settings.
+    New-OSCustomizationNicMapping –OSCustomizationSpec $SpecName –IpMode UseStaticIP –IpAddress $ip[$i] –SubnetMask $mask[$i] –DefaultGateway $gw[$i]
+
+    $vm=New-VM -Name $HostName[$i] -Template $Template[$i] -Host $esxi[$i] -Datastore $datastore[$i] -OSCustomizationSpec $SpecName -Confirm:$false -RunAsync
+
+    }
