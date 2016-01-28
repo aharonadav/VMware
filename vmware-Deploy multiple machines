@@ -1,0 +1,54 @@
+#############################################Deploy multiple machines from a template#####################################################################
+
+#Addon to connect PS to Power Cli
+Add-PSSnapin VMware.VimAutomation.Core               
+$ServerName = "il-vc-01.kaltura.com"                 
+Connect-VIServer -Server $ServerName    
+
+#Import file
+$data = import-Csv \\192.168.192.10\public\IT\Deploy\IL\il-deploy.csv
+$file = Get-content \\192.168.192.10\public\IT\Deploy\IL\il-deploy.csv
+
+# See the imported values:#
+#$data | Out-GridView
+
+#Print imported data on the console
+#Write-Host "HostName=$($line.HostName) IPAddress=$($line.IPAddress) SubnetMask=$($line.SubnetMask) DefaultGateway=$($line.DefaultGateway) Dns=$($line.Dns) DataStore=$($line.DataStore) Esxi=$($line.Esxi) Template=$($line.Template)"
+
+#Create arrays
+$HostName=@()
+$datastore=@()
+$esxi=@()
+$Template=@()
+$ip=@()
+$mask=@()
+$gw=@()
+$dns=@()
+$raw=$file.Length -1
+$SpecName=@()
+
+#Loop to insert a values into the arrays accordingly.
+for($i=0; $i -lt $raw; $i++){
+    $ip+=$data[$i].IPAddress
+    $mask+=$data[$i].SubnetMask
+    $gw+=$data[$i].DefaultGateway
+    $dns+=$data[$i].Dns
+    $HostName+=$data[$i].HostName
+    $datastore+=$data[$i].DataStore
+    $esxi+=$data[$i].Esxi
+    $Template+=$data[$i].Template
+    $specName+=$data[$i].SpecName
+ 
+
+    #Get Customization Specification file.
+    $nicMapping = Get-OSCustomizationNicMapping –OSCustomizationSpec $SpecName[$i]
+
+    # Remove any NIC mappings from the specification
+    Remove-OSCustomizationNicMapping –OSCustomizationNicMapping $nicMapping –Confirm:$false
+
+    #Set Network Customization Specification settings.
+    New-OSCustomizationNicMapping –OSCustomizationSpec $SpecName[$i] –IpMode UseStaticIP –IpAddress $ip[$i] –SubnetMask $mask[$i] –DefaultGateway $gw[$i]
+
+    $vm=New-VM -Name $HostName[$i] -Template $Template[$i] -Host $esxi[$i] -Datastore $datastore[$i] -OSCustomizationSpec $SpecName[$i] -Confirm:$false -RunAsync
+
+    }
